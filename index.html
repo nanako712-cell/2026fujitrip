@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#FDFDFC" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="富士山旅" />
+    <title>2026 富士山初春行</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- React & Babel -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest/dist/lucide-react.min.js"></script>
+
+    <!-- Google GenAI (ESM for Browser) -->
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.run/@google/genai"
+      }
+    }
+    </script>
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'notion-bg': '#FDFDFC',
+              'notion-text': '#37352F',
+              'notion-gray': '#9B9A97',
+              'notion-orange': '#D9730D',
+              'notion-border': '#E9E9E8',
+              'morandi-blue': '#D3DEE8',
+              'morandi-blue-dark': '#7B9CB8',
+              'morandi-green': '#D6E4D9',
+              'morandi-green-dark': '#7CA384',
+              'morandi-pink': '#F2E6E6',
+              'morandi-pink-dark': '#C29696',
+              'morandi-yellow': '#F5EED5',
+              'morandi-yellow-dark': '#B8A66E',
+              'morandi-gray': '#E8E8E8',
+              'morandi-gray-dark': '#8A8A8A',
+            },
+            fontFamily: {
+              sans: ['"Zen Maru Gothic"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+              serif: ['"Noto Serif JP"', 'serif'],
+            },
+            boxShadow: {
+              soft: '0 4px 20px rgba(0,0,0,0.03)',
+              float: '0 10px 30px rgba(0,0,0,0.08)',
+            }
+          },
+        },
+      }
+      
+      // Shim for process.env.API_KEY in browser
+      window.process = { env: { API_KEY: '' } }; 
+      // 注意：若要使用 AI 功能，請在上方 '' 中填入您的 API Key，或由使用者自行輸入
+    </script>
+    <style>
+      body {
+        background-color: #FDFDFC;
+        color: #37352F;
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      input, textarea {
+        user-select: text;
+        -webkit-user-select: text;
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { GoogleGenAI, Type } from "@google/genai";
+        const { useState, useEffect } = React;
+        const { MapPin, Sparkles, Navigation2, Loader2, CloudRain, Sun, Cloud, CloudLightning, Umbrella, Thermometer, Wind, CheckSquare, Square, Luggage, Wallet, RotateCcw, Plus, Trash2, Phone, Plane, Home, ExternalLink, Settings } = LucideReact;
+
+        // --- CONSTANTS & DATA ---
+        const ITINERARY_DATA = [
+          {
+            id: 'day1', label: 'D1', navLabel: '1', date: '2/7', fullDate: '2/7 (五) 東京抵達', title: 'Day 1',
+            weather: { icon: '🌤️', text: '東京祐天寺 12°C・晴時多雲' },
+            todoList: ['領取 JR Pass (成田機場)', '購買 Suica / Pasmo 卡', '開通 eSIM / 網路漫遊', '購買 Narita Express 車票 (去程)', '飯店 Check-in (護照)'],
+            items: [
+              { time: '13:00', location: '成田機場 → 祐天寺', type: 'transport', description: '搭乘 Narita Express 至澀谷，轉東急線至祐天寺。', tags: [{ type: 'tips', text: '重要: 預先購買 NEX 車票' }], mapLink: 'https://www.google.com/maps/search/?api=1&query=Narita+Airport' },
+              { time: '15:00', location: '東急 Stay 祐天寺', type: 'hotel', description: '先辦理 Check-in 放行李。', mapLink: 'https://www.google.com/maps/search/?api=1&query=Tokyu+Stay+Yutenji' },
+              { time: '16:00', location: '中目黑散策', type: 'spot', description: '祐天寺/中目黒散步。', tags: [{ type: 'food', text: '必去: Onibus Coffee' }, { type: 'buy', text: '逛街: 蔦屋書店' }], mapLink: 'https://www.google.com/maps/search/?api=1&query=Onibus+Coffee+Nakameguro' },
+              { time: '19:00', location: 'Shibuya Sky & 晚餐', type: 'food', description: '澀谷居酒屋或魚金晚餐。可順道去 Shibuya Sky。', tags: [{ type: 'tips', text: '建議: 預約夕陽時段看夜景' }], mapLink: 'https://www.google.com/maps/search/?api=1&query=Shibuya+Sky' }
+            ]
+          },
+          {
+            id: 'day2', label: 'D2', navLabel: '2', date: '2/8', fullDate: '2/8 (六) 東京市區', title: 'Day 2',
+            weather: { icon: '☁️', text: '東京預報 13°C・多雲' },
+            todoList: ['確認晴空塔預約憑證', '準備飛鳥山公園野餐墊', '查詢六本木展望台日落時間'],
+            items: [
+              { time: '09:00', location: '晴空塔 + Solamachi', type: 'spot', description: '東京地標巡禮與購物。', mapLink: 'https://www.google.com/maps/search/?api=1&query=Tokyo+Skytree' },
+              { time: '14:00', location: '飛鳥山公園', type: 'spot', description: '小纜車、野餐區、小孩友善。', tags: [{ type: 'tips', text: '親子友善' }], mapLink: 'https://www.google.com/maps/search/?api=1&query=Asukayama+Park' },
+              { time: '18:00', location: '六本木之丘 / 東京鐵塔', type: 'spot', description: 'Tokyo City View 或 東京鐵塔夜景。\n晚餐推薦：上野阿美橫町 或 惠比壽橫丁', mapLink: 'https://www.google.com/maps/search/?api=1&query=Roppongi+Hills' }
+            ]
+          },
+          {
+            id: 'day3', label: 'D3', navLabel: '3', date: '2/9', fullDate: '2/9 (日) 前往富士', title: 'Day 3',
+            weather: { icon: '❄️', text: '御殿場預報 5°C・晴冷' },
+            todoList: ['退房 (檢查隨身物品)', '購買/領取富士回遊車票', '預約御殿場接駁巴士'],
+            items: [
+              { time: '08:00', location: '前往富士御殿場', type: 'transport', description: '祐天寺 → 澀谷 → 新宿。', tags: [{ type: 'transport', text: '交通: 富士回遊或高速巴士 (約2hr)' }] },
+              { time: '11:00', location: 'EDIT X SEVEN', type: 'hotel', description: '富士御殿場設計旅店。', mapLink: 'https://www.google.com/maps/search/?api=1&query=Hotel+Clad+Gotemba' },
+              { time: '13:00', location: '御殿場 Outlets', type: 'buy', description: '富士山背景下的購物體驗。傍晚回飯店看夕陽+泡湯。', tags: [{ type: 'buy', text: '必買行程' }], mapLink: 'https://www.google.com/maps/search/?api=1&query=Gotemba+Premium+Outlets' }
+            ]
+          },
+          {
+            id: 'day4', label: 'D4', navLabel: '4', date: '2/10', fullDate: '2/10 (一) 河口湖', title: 'Day 4',
+            weather: { icon: '🗻', text: '河口湖預報 6°C・晴朗' },
+            todoList: ['查詢天上山纜車運行狀況', '確認回程巴士時刻表'],
+            items: [
+              { time: '09:00', location: '河口湖一日遊', type: 'spot', description: '1. 天上山纜車 (看整座富士山)\n2. 音樂盒之森美術館\n3. 大石公園 (必拍富士倒影)\n4. 湖畔咖啡 (Café Mimi / Hana)', tags: [{ type: 'tips', text: '必拍: 富士倒影' }], mapLink: 'https://www.google.com/maps/search/?api=1&query=Oishi+Park' }
+            ]
+          },
+          {
+            id: 'day5', label: 'D5', navLabel: '5', date: '2/11', fullDate: '2/11 (二) 前往熱海', title: 'Day 5',
+            weather: { icon: '🌊', text: '熱海預報 14°C・多雲' },
+            todoList: ['確認熱海飯店接駁車', '查詢東海道本線時刻'],
+            items: [
+              { time: '10:00', location: '前往熱海', type: 'transport', description: '御殿場 → 沼津 → 熱海 (東海道本線)。' },
+              { time: '14:00', location: '熱海溫泉旅館', type: 'hotel', description: '例: Resorpia / Hotel Micuras / Fufu。\n晚餐：懷石料理。', tags: [{ type: 'food', text: '必吃: 熱海魚市場海鮮丼' }], mapLink: 'https://www.google.com/maps/search/?api=1&query=Atami+Station' }
+            ]
+          },
+          {
+            id: 'day6', label: 'D6', navLabel: '6', date: '2/12', fullDate: '2/12 (三) 熱海漫遊', title: 'Day 6',
+            weather: { icon: '🏯', text: '熱海預報 13°C・陰天' },
+            todoList: ['購買 MOA 美術館門票'],
+            items: [
+              { time: '09:00', location: '熱海城 / MOA 美術館', type: 'spot', description: '壯觀海景。午餐：來宮神社周邊 (2000年神木)。', mapLink: 'https://www.google.com/maps/search/?api=1&query=MOA+Museum+of+Art' },
+              { time: '14:00', location: '伊豆半日遊', type: 'spot', description: '搭伊豆線至伊豆多賀或伊豆高原。' }
+            ]
+          },
+          {
+            id: 'day7', label: 'D7', navLabel: '7', date: '2/13', fullDate: '2/13 (四) 返程', title: 'Day 7',
+            weather: { icon: '✈️', text: '東京預報 15°C・晴朗' },
+            todoList: ['檢查護照與機票', '伴手禮最後確認', '預留機場免稅店時間'],
+            items: [
+              { time: '11:00', location: '熱海 → 東京 → 成田', type: 'transport', description: '1. 熱海搭新幹線至東京站 (45分)\n2. 轉 Narita Express 至機場 (1hr)', tags: [{ type: 'buy', text: '伴手禮: 東京 Banana、Royce' }], mapLink: 'https://www.google.com/maps/search/?api=1&query=Narita+Airport' }
+            ]
+          }
+        ];
+
+        // --- COMPONENTS ---
+
+        const Header = ({ title, subtitle }) => (
+          <header className="sticky top-0 z-50 bg-notion-bg/95 backdrop-blur-sm border-b border-notion-border px-6 py-5 flex justify-between items-baseline shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all">
+            <h1 className="text-2xl font-bold tracking-tight text-notion-text">{title}</h1>
+            {subtitle && <span className="text-sm font-medium text-notion-gray">{subtitle}</span>}
+          </header>
+        );
+
+        const TopDateNav = ({ days, activeId, onSelect }) => (
+          <div className="sticky top-[60px] z-40 bg-notion-bg/95 backdrop-blur-sm border-b border-gray-100 py-3 overflow-x-auto no-scrollbar">
+            <div className="flex px-6 gap-5 min-w-max">
+              {days.map((day) => {
+                const isActive = day.id === activeId;
+                const [month, date] = day.date.split('/');
+                const weekDay = day.fullDate.match(/\((.*?)\)/)?.[1] || '';
+                return (
+                  <button key={day.id} onClick={() => onSelect(day.id)} className="flex flex-col items-center gap-1 transition-all duration-300 group">
+                    <span className={`text-[10px] tracking-widest font-bold uppercase transition-colors ${isActive ? 'text-notion-text' : 'text-gray-300 group-hover:text-gray-400'}`}>DAY {day.navLabel}</span>
+                    <div className={`w-11 h-14 rounded-2xl flex flex-col items-center justify-center border transition-all duration-300 ${isActive ? 'bg-notion-text text-white border-notion-text shadow-md scale-105' : 'bg-white text-gray-400 border-gray-100 group-hover:border-gray-300'}`}>
+                       <span className="text-[10px] font-medium leading-none mb-0.5">{weekDay}</span>
+                       <span className="text-xl font-serif font-bold leading-none">{date}</span>
+                    </div>
+                    {isActive && <div className="w-1 h-1 rounded-full bg-notion-text mt-1" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+        const WeatherWidget = ({ icon, text }) => {
+            const [isExpanded, setIsExpanded] = useState(false);
+            const [loading, setLoading] = useState(false);
+            const [weatherData, setWeatherData] = useState(null);
+
+            const getTemp = () => {
+                const match = text.match(/(\d+)°C/);
+                return match ? parseInt(match[1]) : 15;
+            };
+            const baseTemp = getTemp();
+
+            const generateMockData = () => ({
+                hourly: Array.from({ length: 5 }).map((_, i) => ({
+                    time: `${9 + (i * 3)}:00`,
+                    icon: <Sun size={18} className="text-orange-400" />,
+                    temp: baseTemp + (i % 2 === 0 ? 0 : 2)
+                })),
+                rainChance: text.includes('雨') ? 80 : 20,
+                feelTemp: baseTemp + 2
+            });
+
+            const fetchWeather = async () => {
+                if (!window.process.env.API_KEY) {
+                    setWeatherData(generateMockData());
+                    return;
+                }
+                try {
+                    const ai = new GoogleGenAI({ apiKey: window.process.env.API_KEY });
+                    const response = await ai.models.generateContent({
+                        model: 'gemini-2.5-flash',
+                        contents: `Generate a realistic 5-point hourly weather forecast for "${text}". Return JSON.`,
+                         config: { responseMimeType: 'application/json', responseSchema: { type: Type.OBJECT, properties: { hourly: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { time: {type:Type.STRING}, temp: {type:Type.NUMBER}, condition: {type:Type.STRING} }}}, rainChance: {type:Type.NUMBER}, feelTemp: {type:Type.NUMBER}} } }
+                    });
+                    const data = JSON.parse(response.text);
+                    setWeatherData({
+                        ...data,
+                        hourly: data.hourly.map(h => ({ ...h, icon: <Sun size={18} className="text-orange-400"/> })) 
+                    });
+                } catch (e) { setWeatherData(generateMockData()); }
+            };
+
+            const toggleExpand = async () => {
+                if (!isExpanded) {
+                    setIsExpanded(true);
+                    if (!weatherData) { setLoading(true); await fetchWeather(); setLoading(false); }
+                } else { setIsExpanded(false); }
+            };
+
+            return (
+                <div className="px-6 mt-4 mb-2">
+                    <button onClick={toggleExpand} className="group inline-flex items-center bg-[#F0EEE6] px-3 py-1.5 rounded-full text-sm text-notion-text font-medium hover:bg-[#EBE9E0] transition-all w-fit">
+                        <span className="mr-2 text-base leading-none">{icon}</span><span>{text}</span>
+                        {loading ? <Loader2 className="ml-2 w-3 h-3 animate-spin" /> : <span className={`ml-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▾</span>}
+                    </button>
+                    {isExpanded && weatherData && !loading && (
+                        <div className="mt-3 p-4 bg-white rounded-xl border border-notion-border shadow-sm animate-[fadeIn_0.3s_ease-out]">
+                            <div className="flex justify-between text-center pb-2 overflow-x-auto no-scrollbar">
+                                {weatherData.hourly.map((item, idx) => (
+                                    <div key={idx} className="flex flex-col items-center gap-1.5 min-w-[3rem]">
+                                        <span className="text-[10px] text-notion-gray">{item.time}</span><div className="h-6">{item.icon}</div><span className="text-xs font-bold">{item.temp}°</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const DayChecklist = ({ dayId, items }) => {
+            const [checkedItems, setCheckedItems] = useState(new Set());
+            useEffect(() => {
+                const saved = localStorage.getItem(`checklist_${dayId}`);
+                if (saved) setCheckedItems(new Set(JSON.parse(saved)));
+            }, [dayId]);
+            const toggleItem = (idx) => {
+                const newSet = new Set(checkedItems);
+                if (newSet.has(idx)) newSet.delete(idx); else newSet.add(idx);
+                setCheckedItems(newSet);
+                localStorage.setItem(`checklist_${dayId}`, JSON.stringify(Array.from(newSet)));
+            };
+            if (!items?.length) return null;
+            return (
+                <div className="mx-5 mb-6 bg-white rounded-xl border border-notion-border shadow-soft overflow-hidden">
+                    <div className="px-4 py-3 border-b border-notion-border/60 bg-notion-bg/50 flex justify-between items-center"><h3 className="text-xs font-bold text-notion-gray uppercase">待辦事項</h3><span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md">{checkedItems.size}/{items.length}</span></div>
+                    <div className="p-2">{items.map((item, idx) => (<div key={idx} onClick={() => toggleItem(idx)} className="flex items-start gap-3 p-2.5 cursor-pointer hover:bg-gray-50"><div className={checkedItems.has(idx) ? 'text-notion-green' : 'text-gray-300'}>{checkedItems.has(idx) ? <CheckSquare size={18}/> : <Square size={18}/>}</div><span className={`text-sm ${checkedItems.has(idx) ? 'text-gray-400 line-through' : 'text-notion-text'}`}>{item}</span></div>))}</div>
+                </div>
+            );
+        };
+
+        const ItineraryCard = ({ item }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const [guide, setGuide] = useState(null);
+            const [loading, setLoading] = useState(false);
+            
+            const styles = {
+                transport: { bg: 'bg-morandi-gray', dot: 'bg-gray-400', label: 'TRANSPORT', text: 'text-gray-600' },
+                food: { bg: 'bg-morandi-yellow', dot: 'bg-yellow-600', label: 'FOOD', text: 'text-yellow-800' },
+                spot: { bg: 'bg-morandi-green', dot: 'bg-green-600', label: 'SIGHTSEEING', text: 'text-green-800' },
+                hotel: { bg: 'bg-morandi-blue', dot: 'bg-blue-600', label: 'HOTEL', text: 'text-blue-800' },
+                buy: { bg: 'bg-morandi-pink', dot: 'bg-rose-500', label: 'SHOPPING', text: 'text-rose-800' }
+            }[item.type] || { bg: 'bg-gray-50', dot: 'bg-gray-300', label: 'ACTIVITY', text: 'text-gray-700' };
+
+            const fetchGuide = async (e) => {
+                e.stopPropagation();
+                if (guide) return;
+                if (!window.process.env.API_KEY) { setGuide("請先設定 API Key 才能使用 AI 導遊功能。"); return; }
+                setLoading(true); setIsOpen(true);
+                try {
+                    const ai = new GoogleGenAI({ apiKey: window.process.env.API_KEY });
+                    const res = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: `Guide for "${item.location}". 1 fact, 1 tip. Under 100 words. TC.` });
+                    setGuide(res.text);
+                } catch { setGuide("暫時無法取得資訊"); } finally { setLoading(false); }
+            };
+
+            return (
+                <div className="grid grid-cols-[60px_24px_1fr] gap-0 mb-6 group">
+                    <div className="text-right pt-2 pr-3"><span className="font-serif text-lg font-bold text-notion-text block leading-none">{item.time}</span></div>
+                    <div className="relative flex justify-center"><div className="absolute top-3 bottom-[-24px] w-[1px] bg-gray-200 group-last:bottom-auto group-last:h-full"/><div className={`w-3 h-3 rounded-full mt-3 z-10 border-2 border-white shadow-sm ${styles.dot}`}/></div>
+                    <div className="pl-4 pb-2">
+                        <div onClick={() => setIsOpen(!isOpen)} className={`relative rounded-xl p-5 transition-all cursor-pointer border hover:shadow-soft ${isOpen ? 'bg-white shadow-soft border-gray-100' : `${styles.bg} bg-opacity-40 border-transparent`}`}>
+                            <div className="flex justify-between items-start mb-2"><span className={`text-[10px] tracking-widest font-bold uppercase ${styles.text} opacity-70`}>{styles.label}</span></div>
+                            <h3 className="font-serif text-xl font-bold text-notion-text mb-2 leading-tight">{item.location}</h3>
+                            <div className={`text-sm text-notion-text/80 ${!isOpen && 'line-clamp-2'}`}>{item.description}</div>
+                            {!isOpen && <div className="mt-3 flex items-center gap-3"><button onClick={fetchGuide} className="flex items-center gap-1.5 text-xs font-medium text-notion-orange bg-white/80 px-3 py-1.5 rounded-full shadow-sm"><Sparkles size={12}/>導遊解說</button></div>}
+                            {isOpen && (
+                                <div className="mt-4 pt-4 border-t border-gray-100 animate-[fadeIn_0.3s_ease-out]">
+                                    {item.tags?.length > 0 && <div className="flex flex-wrap gap-2 mb-4">{item.tags.map((t,i)=><span key={i} className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">{t.text}</span>)}</div>}
+                                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg p-3 mb-4 border border-indigo-100/50">
+                                        <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-1.5 text-indigo-900"><Sparkles size={14}/><span className="text-xs font-bold">AI 導遊</span></div>{!guide && !loading && <button onClick={fetchGuide} className="text-[10px] bg-white border border-indigo-200 text-indigo-600 px-2 py-0.5 rounded">載入</button>}</div>
+                                        {loading ? <span className="text-xs text-indigo-400 animate-pulse">整理筆記中...</span> : <p className="text-xs text-indigo-900/80 whitespace-pre-line">{guide || "點擊按鈕獲取攻略..."}</p>}
+                                    </div>
+                                    {item.mapLink && <a href={item.mapLink} target="_blank" className="flex items-center justify-center gap-2 w-full bg-notion-text text-white text-sm font-medium py-2.5 rounded-lg hover:bg-black transition-colors"><Navigation2 size={16}/>Google Maps</a>}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const BottomNav = ({ activeTabId, onTabChange }) => {
+            const tabs = [{ id: 'trip', label: '行程', icon: <Plane size={20}/> }, { id: 'prep', label: '準備', icon: <Luggage size={20}/> }, { id: 'budget', label: '預算', icon: <Wallet size={20}/> }, { id: 'tools', label: '工具', icon: <Settings size={20}/> }];
+            return (
+                <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md border border-gray-200 rounded-full shadow-float px-6 py-3 z-50 flex items-center gap-8 mb-[env(safe-area-inset-bottom)]">
+                    {tabs.map(t => {
+                        const isActive = t.id === 'trip' ? activeTabId.startsWith('day') : activeTabId === t.id;
+                        return (<button key={t.id} onClick={() => onTabChange(t.id === 'trip' ? 'day1' : t.id)} className={`flex flex-col items-center gap-1 relative ${isActive ? 'text-notion-text scale-110' : 'text-gray-300'}`}>{t.icon}{isActive && <div className="absolute -bottom-2 w-1 h-1 rounded-full bg-notion-orange"/>}</button>);
+                    })}
+                </nav>
+            );
+        };
+
+        const ToolsView = () => (
+            <div className="space-y-4">
+                <div className="bg-white rounded-lg p-4 border border-notion-border shadow-sm"><div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100"><span className="text-notion-orange"><Plane size={18}/></span><h3 className="font-bold text-sm">航班資訊</h3></div><div className="space-y-3 text-sm"><div className="flex justify-between"><span>去程</span><span className="text-gray-300">(點擊編輯)</span></div><div className="flex justify-between"><span>回程</span><span className="text-gray-300">(點擊編輯)</span></div></div></div>
+                <div className="bg-white rounded-lg p-4 border border-notion-border shadow-sm"><div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100"><span className="text-notion-orange"><Home size={18}/></span><h3 className="font-bold text-sm">住宿列表</h3></div><div className="space-y-3 text-sm"><div className="flex justify-between"><span>D1-2</span><span>東急 Stay 祐天寺</span></div><div className="flex justify-between"><span>D3-4</span><span>EDIT X SEVEN</span></div></div></div>
+            </div>
+        );
+
+        const BudgetView = () => {
+            const [expenses, setExpenses] = useState([]);
+            const [desc, setDesc] = useState(''); const [amt, setAmt] = useState('');
+            useEffect(() => { const saved = localStorage.getItem('tripExpenses'); if(saved) setExpenses(JSON.parse(saved)); }, []);
+            useEffect(() => localStorage.setItem('tripExpenses', JSON.stringify(expenses)), [expenses]);
+            const add = (e) => { e.preventDefault(); if(!desc||!amt) return; setExpenses([...expenses, {id:Date.now(), d:desc, a:parseInt(amt)}]); setDesc(''); setAmt(''); };
+            const total = expenses.reduce((s, i) => s + i.a, 0);
+            return (
+                <div className="space-y-6">
+                    <div className="bg-[#F0EEE6] rounded-xl p-5 text-notion-text shadow-soft border border-gray-200 relative overflow-hidden"><div className="relative z-10"><div className="flex items-center gap-2 mb-1 text-notion-gray text-sm font-medium"><Wallet size={16}/><span>總支出</span></div><div className="text-3xl font-serif font-bold tracking-tight text-notion-text">¥ {total.toLocaleString()}</div></div><div className="absolute right-[-10px] bottom-[-20px] opacity-[0.05]"><Wallet size={120}/></div></div>
+                    <div className="bg-white rounded-xl p-4 border border-notion-border"><form onSubmit={add} className="flex gap-2"><input value={desc} onChange={e=>setDesc(e.target.value)} placeholder="項目" className="flex-1 bg-notion-bg border border-notion-border rounded-lg px-3 py-2 text-sm"/><input value={amt} onChange={e=>setAmt(e.target.value)} placeholder="¥" type="number" className="w-24 bg-notion-bg border border-notion-border rounded-lg px-3 py-2 text-sm"/><button type="submit" className="bg-notion-dark bg-black text-white rounded-lg px-4"><Plus size={20}/></button></form></div>
+                    <div className="bg-white rounded-xl border border-notion-border overflow-hidden divide-y divide-gray-100">{expenses.map(e=>(<div key={e.id} className="flex justify-between p-4"><span className="text-sm font-medium">{e.d}</span><span className="font-bold text-sm">¥{e.a.toLocaleString()}</span></div>))}</div>
+                </div>
+            );
+        };
+        
+        const PreparationView = () => {
+             const [checked, setChecked] = useState(new Set());
+             useEffect(() => { const s = localStorage.getItem('prep_checklist'); if(s) setChecked(new Set(JSON.parse(s))); }, []);
+             const toggle = (i) => { const n = new Set(checked); if(n.has(i)) n.delete(i); else n.add(i); setChecked(n); localStorage.setItem('prep_checklist', JSON.stringify(Array.from(n))); };
+             const cats = [{t:"證件", i:["護照", "VJW", "日幣", "信用卡"]}, {t:"電子", i:["手機", "網卡", "轉接頭"]}];
+             const prog = Math.round((checked.size / cats.reduce((a,c)=>a+c.i.length,0))*100) || 0;
+             return (
+                 <div className="space-y-6">
+                    <div className="bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl p-5 text-white shadow-lg relative overflow-hidden"><div className="relative z-10"><div className="flex items-center gap-2 mb-2 opacity-90 text-sm"><Luggage size={16}/><span>進度</span></div><span className="text-4xl font-bold">{prog}%</span><div className="w-full bg-black/20 h-1.5 rounded-full mt-3"><div className="bg-white h-full rounded-full transition-all" style={{width:`${prog}%`}}/></div></div></div>
+                    {cats.map((c,idx)=>(<div key={idx} className="bg-white rounded-xl border border-notion-border"><div className="px-4 py-3 bg-gray-50/50 border-b border-gray-100 font-bold text-sm">{c.t}</div><div className="divide-y divide-gray-100">{c.i.map(item=>(<div key={item} onClick={()=>toggle(item)} className="flex gap-3 p-3.5 cursor-pointer hover:bg-gray-50"><div className={checked.has(item)?'text-green-500':'text-gray-300'}>{checked.has(item)?<CheckSquare size={18}/>:<Square size={18}/>}</div><span className={`text-sm ${checked.has(item)?'text-gray-400 line-through':''}`}>{item}</span></div>))}</div></div>))}
+                 </div>
+             );
+        };
+
+        const App = () => {
+            const [activeTabId, setActiveTabId] = useState('day1');
+            useEffect(() => { if(['tools','budget','prep'].includes(activeTabId)) window.scrollTo({top:0, behavior:'instant'}); }, [activeTabId]);
+            
+            const activeDay = ITINERARY_DATA.find(d => d.id === activeTabId);
+            const isTrip = !!activeDay;
+            let headerTitle = isTrip ? "2026 富士山初春行" : {tools:'旅遊小工具', budget:'旅費記帳', prep:'行前準備'}[activeTabId];
+
+            return (
+                <div className="min-h-screen bg-notion-bg font-sans pb-40 selection:bg-notion-orange/20">
+                    <Header title={headerTitle} subtitle={isTrip ? "Family Trip" : ""} />
+                    {isTrip && <TopDateNav days={ITINERARY_DATA} activeId={activeTabId} onSelect={setActiveTabId} />}
+                    <main className="max-w-lg mx-auto pt-4">
+                        {activeTabId === 'tools' ? <div className="px-6 py-4"><ToolsView/></div> :
+                         activeTabId === 'budget' ? <div className="px-6 py-4"><BudgetView/></div> :
+                         activeTabId === 'prep' ? <div className="px-6 py-4"><PreparationView/></div> :
+                         <div className="animate-[fadeIn_0.3s_ease-out]">
+                             <div className="px-6 mb-4 text-center"><h2 className="font-serif text-2xl font-bold text-notion-text mb-1">{activeDay?.title}</h2><p className="text-xs text-notion-gray tracking-widest uppercase">{activeDay?.fullDate}</p></div>
+                             {activeDay?.weather && <WeatherWidget icon={activeDay.weather.icon} text={activeDay.weather.text} />}
+                             {activeDay?.todoList && <DayChecklist dayId={activeDay.id} items={activeDay.todoList} />}
+                             <div className="px-5 mt-6 relative">{activeDay?.items.map((item, i) => <ItineraryCard key={i} item={item} />)}<div className="absolute left-[84px] bottom-0 w-3 h-3 bg-gray-200 rounded-full" /></div>
+                         </div>
+                        }
+                    </main>
+                    <BottomNav activeTabId={activeTabId} onTabChange={setActiveTabId} />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
